@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo Card • Epic Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap');
+        
+        :root {
+            --tw-color-primary: #6366f1;
+        }
+        
+        * {
+            transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, transform, box-shadow, max-height;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+        
+        .todo-card {
+            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+        }
+        
+        .todo-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 35px 70px -15px rgb(99 102 241 / 0.3),
+                        0 0 0 4px rgb(99 102 241 / 0.15);
+        }
+        
+        .line-through-custom {
+            text-decoration: line-through;
+            text-decoration-thickness: 3px;
+            text-underline-offset: 4px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card-content {
+            animation: fadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        
+        .priority-glow {
+            animation: priorityPulse 2s infinite ease-in-out;
+        }
+        
+        @keyframes priorityPulse {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.15); }
+        }
+        
+        .tag-hover {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .tag-hover:hover {
+            transform: scale(1.1) rotate(2deg);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+        
+        .time-icon {
+            display: inline-block;
+            animation: spin-slow 20s linear infinite;
+        }
+
+        #collapsible-section {
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        #collapsible-section:not(.expanded)::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 48px;
+            background: linear-gradient(transparent, #ffffff);
+            pointer-events: none;
+            z-index: 10;
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+        }
+
+        .toast {
+            animation: toastPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        
+        @keyframes toastPop {
+            0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 min-h-screen flex items-center justify-center p-6 font-sans">
+    <article 
+        data-testid="test-todo-card"
+        class="todo-card max-w-[420px] w-full bg-white text-zinc-900 rounded-3xl overflow-hidden border border-white/80 shadow-2xl relative">
+        
+        <div 
+            id="priority-accent-bar"
+            class="h-2 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500"></div>
+    
+        <div class="px-6 pt-6 pb-4 flex items-center justify-between">
+            <div class="flex items-center gap-x-3 flex-1">
+                <div 
+                    id="priority-indicator"
+                    data-testid="test-todo-priority-indicator"
+                    class="w-5 h-5 flex-shrink-0 rounded-2xl ring-2 ring-white/80 bg-red-500">
+                </div>
+                
+                <input 
+                    type="checkbox" 
+                    id="complete-toggle"
+                    data-testid="test-todo-complete-toggle"
+                    aria-label="Mark task as completed"
+                    class="w-7 h-7 accent-indigo-600 rounded-2xl border-2 border-zinc-300 focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 cursor-pointer">
+                
+                <h3 
+                    id="todo-title"
+                    data-testid="test-todo-title"
+                    class="text-2xl font-semibold tracking-[-0.02em] leading-none">
+                </h3>
+            </div>
+            
+            <div 
+                id="priority-badge"
+                data-testid="test-todo-priority"
+                class="priority-glow px-6 py-3 text-base font-bold rounded-3xl bg-gradient-to-r from-red-500 to-rose-600 text-white flex items-center gap-x-2 shadow-lg shadow-red-500/30">
+            </div>
+        </div>
+        
+        <div id="view-content">
+            <div class="px-6">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-medium uppercase tracking-[1px] text-zinc-500">DESCRIPTION</span>
+                    <button 
+                        id="expand-toggle"
+                        data-testid="test-todo-expand-toggle"
+                        aria-expanded="false"
+                        aria-controls="collapsible-section"
+                        class="flex items-center gap-x-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded-3xl px-4 py-1 hover:bg-zinc-100">
+                        <span id="expand-text">Expand</span>
+                        <svg id="chevron" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div 
+                    id="collapsible-section"
+                    data-testid="test-todo-collapsible-section"
+                    class="">
+                    <p 
+                        data-testid="test-todo-description"
+                        class="text-zinc-600 text-[15.5px] leading-relaxed pr-2">
+                    </p>
+                </div>
+            </div>
+            
+            <div class="px-6 mt-8 card-content">
+                <div class="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-sky-50 rounded-3xl px-6 py-5 border border-white shadow-inner">
+                    <div class="flex items-center gap-x-3">
+                        <span class="text-2xl">📅</span>
+                        <time 
+                            data-testid="test-todo-due-date"
+                            class="text-zinc-800 font-semibold text-lg">
+                        </time>
+                    </div>
+                    
+                    <div class="flex items-center gap-x-3">
+                        <div 
+                            id="overdue-indicator"
+                            data-testid="test-todo-overdue-indicator"
+                            class="hidden px-4 py-1 text-xs font-bold bg-red-100 text-red-700 rounded-3xl flex items-center gap-x-1 shadow-sm animate-pulse">
+                            <span class="text-base">🚨</span>
+                            OVERDUE
+                        </div>
+                        
+                        <div 
+                            id="time-remaining"
+                            data-testid="test-todo-time-remaining"
+                            aria-live="polite"
+                            class="text-emerald-600 font-semibold text-sm flex items-center gap-x-2">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex items-center gap-x-6">
+                    <div class="flex items-center gap-x-3 flex-1">
+                        <span class="text-xs font-medium uppercase tracking-[1px] text-zinc-500">Status</span>
+                        
+                        <div 
+                            id="status-control"
+                            data-testid="test-todo-status-control"
+                            class="inline-flex bg-zinc-100 rounded-3xl p-1 text-sm font-semibold shadow-inner">
+                            <button 
+                                id="status-pending-btn"
+                                onclick="setStatus('Pending')"
+                                class="px-6 py-2 rounded-3xl data-[active=true]:bg-blue-100 data-[active=true]:text-blue-700 data-[active=true]:shadow-sm">Pending</button>
+                            <button 
+                                id="status-progress-btn"
+                                onclick="setStatus('In Progress')"
+                                class="px-6 py-2 rounded-3xl data-[active=true]:bg-amber-100 data-[active=true]:text-amber-700 data-[active=true]:shadow-sm">In Progress</button>
+                            <button 
+                                id="status-done-btn"
+                                onclick="setStatus('Done')"
+                                class="px-6 py-2 rounded-3xl data-[active=true]:bg-emerald-100 data-[active=true]:text-emerald-700 data-[active=true]:shadow-sm">Done</button>
+                        </div>
+                    </div>
+                    
+                    <span 
+                        id="status-badge"
+                        data-testid="test-todo-status"
+                        class="inline-flex items-center px-5 py-2 text-sm font-semibold rounded-3xl bg-blue-100 text-blue-700 shadow-sm">
+                    </span>
+                </div>
+                
+                <div class="mt-6">
+                    <div 
+                        data-testid="test-todo-tags"
+                        class="flex flex-wrap gap-2">
+                        <span data-testid="test-todo-tag-work" class="tag-hover px-5 py-2 text-xs font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-3xl flex items-center">💼 work</span>
+                        <span data-testid="test-todo-tag-urgent" class="tag-hover px-5 py-2 text-xs font-medium bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-3xl flex items-center">⚡ urgent</span>
+                        <span class="tag-hover px-5 py-2 text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-3xl flex items-center">🎨 frontend</span>
+                        <span class="tag-hover px-5 py-2 text-xs font-medium bg-violet-100 hover:bg-violet-200 text-violet-700 rounded-3xl flex items-center">✨ magic</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div 
+            id="edit-form"
+            data-testid="test-todo-edit-form"
+            class="hidden px-6 pt-2 pb-8 flex-col gap-6">
+            
+            <div class="flex flex-col gap-6">
+                <div>
+                    <label for="edit-title-input" class="block text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">Title</label>
+                    <input 
+                        id="edit-title-input"
+                        data-testid="test-todo-edit-title-input"
+                        type="text"
+                        class="w-full px-5 py-4 text-2xl font-semibold bg-white border border-zinc-200 rounded-3xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200 outline-none">
+                </div>
+                
+                <div>
+                    <label for="edit-description-input" class="block text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">Description</label>
+                    <textarea 
+                        id="edit-description-input"
+                        data-testid="test-todo-edit-description-input"
+                        rows="5"
+                        class="w-full px-5 py-4 text-[15.5px] leading-relaxed bg-white border border-zinc-200 rounded-3xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200 outline-none resize-y">
+                    </textarea>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label for="edit-priority-select" class="block text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">Priority</label>
+                        <select 
+                            id="edit-priority-select"
+                            data-testid="test-todo-edit-priority-select"
+                            class="w-full px-5 py-4 bg-white border border-zinc-200 rounded-3xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200 outline-none text-base">
+                            <option value="Low">🌱 Low</option>
+                            <option value="Medium">⚠️ Medium</option>
+                            <option value="High">🔥 High</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="edit-due-date-input" class="block text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">Due Date</label>
+                        <input 
+                            id="edit-due-date-input"
+                            data-testid="test-todo-edit-due-date-input"
+                            type="datetime-local"
+                            class="w-full px-5 py-4 bg-white border border-zinc-200 rounded-3xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200 outline-none">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex gap-x-3 pt-6 border-t border-zinc-100">
+                <button 
+                    data-testid="test-todo-cancel-button"
+                    onclick="handleCancelEdit()"
+                    class="flex-1 py-4 text-zinc-600 font-semibold bg-zinc-100 hover:bg-zinc-200 rounded-3xl focus:outline-none focus:ring-2 focus:ring-zinc-300 active:scale-95">
+                    Cancel
+                </button>
+                <button 
+                    data-testid="test-todo-save-button"
+                    onclick="handleSaveEdit()"
+                    class="flex-1 py-4 text-white font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 hover:brightness-110 rounded-3xl focus:outline-none focus:ring-2 focus:ring-indigo-300 active:scale-95">
+                    💾 Save Changes
+                </button>
+            </div>
+        </div>
+        
+        <div class="px-6 py-6 flex items-center justify-end gap-x-3 border-t border-zinc-100">
+            <button 
+                data-testid="test-todo-edit-button"
+                aria-label="Edit this todo"
+                onclick="handleEdit()"
+                class="flex items-center justify-center w-12 h-12 rounded-3xl hover:bg-indigo-50 text-zinc-400 hover:text-indigo-600 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.75">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+            </button>
+            
+            <button 
+                data-testid="test-todo-delete-button"
+                aria-label="Delete this todo"
+                onclick="handleDelete()"
+                class="flex items-center justify-center w-12 h-12 rounded-3xl hover:bg-red-50 text-zinc-400 hover:text-red-600 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.75">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.595 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.595-1.858L5 7m5 4v6m4-6v6m1-10V9a1 1 0 00-1-1h-4a1 1 0 00-1 1v1M12 4v1m-7 0h14" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="toast-container" class="absolute top-4 right-4 z-50 flex flex-col gap-2"></div>
+    </article>
+
+    <script>
+        function initializeTailwind() {
+            tailwind.config = { content: [], theme: { extend: {} } };
+        }
+
+        let currentTodo = {
+            title: "Build Testable Todo Card",
+            description: "Implement a clean, modern Todo card component with all required data-testid values, full accessibility, responsiveness, and real-time time-remaining updates.",
+            priority: "High",
+            dueDate: new Date('2026-04-25T18:00:00Z'),
+            status: "Pending",
+            completed: false,
+            isExpanded: false
+        };
+
+        let timeInterval = null;
+
+        function formatDateForInput(date) {
+            const pad = (n) => n < 10 ? '0' + n : n;
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        function getTimeRemaining(dueDate) {
+            const now = new Date();
+            let diffMs = dueDate.getTime() - now.getTime();
+            const isOverdue = diffMs < 0;
+            if (isOverdue) diffMs = Math.abs(diffMs);
+
+            const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            if (isOverdue) {
+                if (days >= 1) return { text: `Overdue by ${days} day${days > 1 ? 's' : ''}`, emoji: '🚨' };
+                if (hours >= 1) return { text: `Overdue by ${hours} hour${hours > 1 ? 's' : ''}`, emoji: '🚨' };
+                return { text: `Overdue by ${minutes} minute${minutes !== 1 ? 's' : ''}`, emoji: '🚨' };
+            }
+
+            if (days >= 2) return { text: `Due in ${days} days`, emoji: '📆' };
+            if (days === 1) return { text: "Due tomorrow", emoji: '🌅' };
+            if (hours >= 1) return { text: `Due in ${hours} hour${hours > 1 ? 's' : ''}`, emoji: '⏳' };
+            if (minutes > 0) return { text: `Due in ${minutes} minute${minutes > 1 ? 's' : ''}`, emoji: '⏳' };
+            return { text: "Due now!", emoji: '⚡' };
+        }
+
+        function renderTitle() {
+            document.getElementById('todo-title').textContent = currentTodo.title;
+        }
+
+        function renderDescription() {
+            const descEl = document.querySelector('[data-testid="test-todo-description"]');
+            if (descEl) descEl.textContent = currentTodo.description;
+        }
+
+        function renderPriority() {
+            const indicator = document.getElementById('priority-indicator');
+            const badge = document.getElementById('priority-badge');
+            const accentBar = document.getElementById('priority-accent-bar');
+
+            let dotColor = 'bg-red-500';
+            let emoji = '🔥';
+            let text = 'HIGH';
+            let gradient = 'from-red-500 to-rose-600';
+            let shadow = 'shadow-red-500/30';
+            let accentGradient = 'from-red-500 via-rose-500 to-pink-500';
+
+            switch (currentTodo.priority) {
+                case 'Low':
+                    dotColor = 'bg-emerald-500';
+                    emoji = '🌱';
+                    text = 'LOW';
+                    gradient = 'from-emerald-400 to-teal-500';
+                    shadow = 'shadow-emerald-500/30';
+                    accentGradient = 'from-emerald-400 via-teal-400 to-cyan-400';
+                    break;
+                case 'Medium':
+                    dotColor = 'bg-amber-500';
+                    emoji = '⚠️';
+                    text = 'MEDIUM';
+                    gradient = 'from-amber-400 to-orange-500';
+                    shadow = 'shadow-amber-500/30';
+                    accentGradient = 'from-amber-400 via-orange-400 to-yellow-400';
+                    break;
+            }
+
+            indicator.className = `w-5 h-5 flex-shrink-0 rounded-2xl ring-2 ring-white/80 ${dotColor}`;
+            badge.innerHTML = `<span class="text-2xl leading-none drop-shadow-sm">${emoji}</span> ${text}`;
+            badge.className = `priority-glow px-6 py-3 text-base font-bold rounded-3xl bg-gradient-to-r ${gradient} text-white flex items-center gap-x-2 shadow-lg ${shadow}`;
+            accentBar.className = `h-2 ${accentGradient}`;
+        }
+
+        function renderDueDate() {
+            const dueEl = document.querySelector('[data-testid="test-todo-due-date"]');
+            const formatted = currentTodo.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            dueEl.textContent = `Due ${formatted}`;
+            dueEl.setAttribute('datetime', currentTodo.dueDate.toISOString());
+        }
+
+        function renderStatusBadge() {
+            const badge = document.getElementById('status-badge');
+            let text = currentTodo.status.toUpperCase();
+            let classes = 'inline-flex items-center px-5 py-2 text-sm font-semibold rounded-3xl shadow-sm';
+            
+            switch (currentTodo.status) {
+                case 'Pending': classes += ' bg-blue-100 text-blue-700'; break;
+                case 'In Progress': classes += ' bg-amber-100 text-amber-700'; text = 'IN PROGRESS'; break;
+                case 'Done': classes += ' bg-emerald-100 text-emerald-700'; text = 'DONE ✨'; break;
+            }
+            badge.textContent = text;
+            badge.className = classes;
+        }
+
+        function renderStatusControl() {
+            const statuses = [
+                { key: 'Pending', id: 'status-pending-btn' },
+                { key: 'In Progress', id: 'status-progress-btn' },
+                { key: 'Done', id: 'status-done-btn' }
+            ];
+            statuses.forEach(({ key, id }) => {
+                const btn = document.getElementById(id);
+                if (btn) btn.setAttribute('data-active', currentTodo.status === key ? 'true' : 'false');
+            });
+        }
+
+        function renderCollapsible() {
+            const section = document.getElementById('collapsible-section');
+            const toggleBtn = document.getElementById('expand-toggle');
+            const chevron = document.getElementById('chevron');
+            const textEl = document.getElementById('expand-text');
+
+            if (!section) return;
+
+            section.classList.toggle('expanded', currentTodo.isExpanded);
+            section.style.maxHeight = currentTodo.isExpanded ? section.scrollHeight + 'px' : '72px';
+
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', currentTodo.isExpanded);
+            if (chevron) chevron.style.transform = currentTodo.isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+            if (textEl) textEl.textContent = currentTodo.isExpanded ? 'Collapse' : 'Expand';
+        }
+
+        function toggleExpand() {
+            currentTodo.isExpanded = !currentTodo.isExpanded;
+            renderCollapsible();
+        }
+
+        function updateTimeDisplay() {
+            const timeEl = document.getElementById('time-remaining');
+            const overdueEl = document.getElementById('overdue-indicator');
+            
+            if (!timeEl) return;
+            
+            if (currentTodo.status === 'Done') {
+                timeEl.innerHTML = `<span class="text-xl">✅</span><span class="font-semibold">Completed</span>`;
+                timeEl.className = 'text-emerald-600 font-semibold text-sm flex items-center gap-x-2';
+                overdueEl.classList.add('hidden');
+                return;
+            }
+            
+            const result = getTimeRemaining(currentTodo.dueDate);
+            timeEl.innerHTML = `<span class="text-xl time-icon">${result.emoji}</span><span>${result.text}</span>`;
+            
+            if (result.text.includes('Overdue')) {
+                timeEl.className = 'text-red-600 font-semibold text-sm flex items-center gap-x-2';
+                overdueEl.classList.remove('hidden');
+            } else {
+                timeEl.className = 'text-emerald-600 font-semibold text-sm flex items-center gap-x-2';
+                overdueEl.classList.add('hidden');
+            }
+        }
+
+        function applyCompleteVisuals(checked) {
+            const title = document.getElementById('todo-title');
+            if (checked) {
+                title.classList.add('line-through-custom', 'text-zinc-400');
+                title.style.transform = 'scale(1.05)';
+                setTimeout(() => title.style.transform = '', 200);
+            } else {
+                title.classList.remove('line-through-custom', 'text-zinc-400');
+            }
+        }
+
+        window.setStatus = function (newStatus) {
+            currentTodo.status = newStatus;
+            currentTodo.completed = newStatus === 'Done';
+            
+            const checkbox = document.getElementById('complete-toggle');
+            checkbox.checked = currentTodo.completed;
+            
+            applyCompleteVisuals(currentTodo.completed);
+            renderStatusBadge();
+            renderStatusControl();
+            updateTimeDisplay();
+            showToast(newStatus === 'Done' ? '🎉 Task completed!' : `✦ Status updated to ${newStatus}`);
+        };
+
+        function enterEditMode() {
+            const viewContent = document.getElementById('view-content');
+            const editForm = document.getElementById('edit-form');
+            
+            viewContent.classList.add('hidden');
+            editForm.classList.remove('hidden');
+            editForm.classList.add('flex');
+            
+            document.getElementById('edit-title-input').value = currentTodo.title;
+            document.getElementById('edit-description-input').value = currentTodo.description;
+            document.getElementById('edit-priority-select').value = currentTodo.priority;
+            document.getElementById('edit-due-date-input').value = formatDateForInput(currentTodo.dueDate);
+            
+            setTimeout(() => document.getElementById('edit-title-input').focus(), 100);
+        }
+
+        function exitEditMode() {
+            const viewContent = document.getElementById('view-content');
+            const editForm = document.getElementById('edit-form');
+            
+            viewContent.classList.remove('hidden');
+            editForm.classList.add('hidden');
+            editForm.classList.remove('flex');
+            
+            document.querySelector('[data-testid="test-todo-edit-button"]').focus();
+        }
+
+        window.handleSaveEdit = function () {
+            const titleVal = document.getElementById('edit-title-input').value.trim();
+            if (titleVal) currentTodo.title = titleVal;
+            
+            currentTodo.description = document.getElementById('edit-description-input').value.trim();
+            currentTodo.priority = document.getElementById('edit-priority-select').value;
+            
+            const dueVal = document.getElementById('edit-due-date-input').value;
+            if (dueVal) currentTodo.dueDate = new Date(dueVal);
+            
+            currentTodo.isExpanded = currentTodo.description.length <= 180;
+            
+            renderTitle();
+            renderDescription();
+            renderPriority();
+            renderDueDate();
+            renderStatusBadge();
+            renderStatusControl();
+            renderCollapsible();
+            updateTimeDisplay();
+            
+            exitEditMode();
+            showToast('✅ Changes saved!');
+        };
+
+        window.handleCancelEdit = function () {
+            exitEditMode();
+        };
+
+        function handleCheckboxToggle() {
+            const checkbox = document.getElementById('complete-toggle');
+            checkbox.addEventListener('change', function () {
+                currentTodo.completed = this.checked;
+                if (this.checked) currentTodo.status = 'Done';
+                else currentTodo.status = 'Pending';
+                
+                applyCompleteVisuals(this.checked);
+                renderStatusBadge();
+                renderStatusControl();
+                updateTimeDisplay();
+                
+                if (this.checked) showToast('🎉 Task marked complete!');
+            });
+        }
+
+        function startTimeUpdater() {
+            const update = () => updateTimeDisplay();
+            update();
+            if (timeInterval) clearInterval(timeInterval);
+            timeInterval = setInterval(update, 30000);
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast flex items-center gap-x-2 px-5 py-3 bg-white text-zinc-800 rounded-3xl shadow-2xl border border-zinc-100 text-sm font-medium`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 1, 1)';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 2800);
+        }
+
+        function initializeTodoCard() {
+            initializeTailwind();
+            currentTodo.isExpanded = currentTodo.description.length <= 180;
+            
+            renderTitle();
+            renderDescription();
+            renderPriority();
+            renderDueDate();
+            renderStatusBadge();
+            renderStatusControl();
+            renderCollapsible();
+            updateTimeDisplay();
+            
+            startTimeUpdater();
+            handleCheckboxToggle();
+            
+            const expandToggleEl = document.getElementById('expand-toggle');
+            if (expandToggleEl) expandToggleEl.addEventListener('click', toggleExpand);
+        }
+
+        window.handleEdit = enterEditMode;
+        
+        window.handleDelete = function () {
+            if (confirm('Delete this epic todo item?')) {
+                const card = document.querySelector('[data-testid="test-todo-card"]');
+                card.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 1, 1)';
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px) scale(0.95)';
+                
+                setTimeout(() => {
+                    showToast('🗑️ Todo deleted');
+                    setTimeout(() => window.location.reload(), 800);
+                }, 420);
+            }
+        };
+        
+        window.onload = initializeTodoCard;
+    </script>
+</body>
+</html>
